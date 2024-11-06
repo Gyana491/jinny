@@ -34,7 +34,7 @@ io.on('connection', (socket) => {
                             content: data.final.trim()
                         }
                     ],
-                    model: "gpt-3.5-turbo",
+                    model: "gpt-3.5-turbo", // change the model name here
                     temperature: 0.7,
                     max_tokens: 150 // Limit response length for faster replies
                 });
