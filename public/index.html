@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Speech to Text with ChatGPT</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Real-time Speech to Text with ChatGPT</h1>
+        <div class="status-container">
+            <div id="status">Listening...</div>
+        </div>
+        <div class="transcript-container">
+            <h2>Your Speech:</h2>
+            <div id="transcript"></div>
+        </div>
+        <div class="response-container">
+            <h2>ChatGPT Response:</h2>
+            <div id="gpt-response"></div>
+        </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html> 
