@@ -956,3 +956,98 @@ html {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     transition: all 0.3s ease;
 }
+
+/* Add these keyframes for the gradient animation */
+@keyframes gradientBorder {
+    0% {
+        border-image-source: linear-gradient(45deg, #9C27B0, #FF4081, #9C27B0);
+    }
+    50% {
+        border-image-source: linear-gradient(45deg, #FF4081, #9C27B0, #FF4081);
+    }
+    100% {
+        border-image-source: linear-gradient(45deg, #9C27B0, #FF4081, #9C27B0);
+    }
+}
+
+@keyframes glowPulse {
+    0% {
+        box-shadow: 0 0 5px #9C27B0,
+                    0 0 15px #9C27B0,
+                    0 0 25px #9C27B0;
+    }
+    50% {
+        box-shadow: 0 0 10px #FF4081,
+                    0 0 20px #FF4081,
+                    0 0 30px #FF4081;
+    }
+    100% {
+        box-shadow: 0 0 5px #9C27B0,
+                    0 0 15px #9C27B0,
+                    0 0 25px #9C27B0;
+    }
+}
+
+/* Update the talk-button styles */
+.talk-button {
+    /* ... existing styles ... */
+    position: relative;
+    /* border: 3px solid transparent; */
+    background-clip: padding-box;
+    transition: all 0.3s ease;
+}
+
+/* Add the animated border and glow when listening */
+.talk-button.listening {
+    background: linear-gradient(45deg, var(--accent-color), var(--primary-color));
+    /* border: 3px solid transparent; */
+    border-radius: 50%;
+    border-image: linear-gradient(45deg, #9C27B0, #FF4081, #9C27B0);
+    border-image-slice: 1;
+    animation: 
+        gradientBorder 3s linear infinite,
+        glowPulse 2s ease-in-out infinite,
+        pulseButton 1.5s infinite;
+}
+
+/* Add a pseudo-element for additional glow effect */
+.talk-button.listening::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
+    border-radius: 50%;
+    background: transparent;
+    z-index: -1;
+    animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* Update the existing pulseButton animation */
+@keyframes pulseButton {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Adjust for mobile devices */
+@media (max-width: 768px) {
+    .talk-button.listening::after {
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+    }
+    
+    .talk-button.listening {
+        border-width: 2px;
+        border-radius: 50%;
+    }
+}
