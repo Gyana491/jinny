@@ -431,33 +431,219 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // Button event listeners
-        talkButton.addEventListener('mousedown', () => {
-            stopSpeaking(); // Stop speaking when button is pressed
-            recognition.start();
-        });
+        // Updated button event listeners with long press support
+        let pressTimer = null;
+        let isLongPress = false;
 
-        talkButton.addEventListener('mouseup', () => {
-            recognition.stop();
-        });
-
-        talkButton.addEventListener('mouseleave', () => {
-            if (isListening) {
-                recognition.stop();
+        // Helper function to handle start of recording
+        function startRecording(e) {
+            if (e) e.preventDefault();
+            if (isSpeaking) stopSpeaking();
+            
+            // Visual feedback
+            talkButton.classList.add('active');
+            voiceWave.classList.add('speaking');
+            
+            // Start recording
+            try {
+                recognition.start();
+                
+                // Start long press timer
+                pressTimer = setTimeout(() => {
+                    isLongPress = true;
+                    // Add visual feedback for long press
+                    talkButton.classList.add('long-press');
+                }, 500); // 500ms to trigger long press
+            } catch (error) {
+                console.error('Recognition start error:', error);
             }
+        }
+
+        // Helper function to handle end of recording
+        function stopRecording(e) {
+            if (e) e.preventDefault();
+            
+            // Clear long press timer
+            clearTimeout(pressTimer);
+            
+            // Visual feedback
+            talkButton.classList.remove('active', 'long-press');
+            
+            // Only stop recognition if it wasn't a long press or if we're ending a long press
+            if (!isLongPress || (isLongPress && e.type === 'touchend')) {
+                try {
+                    recognition.stop();
+                } catch (error) {
+                    console.error('Recognition stop error:', error);
+                }
+            }
+            
+            isLongPress = false;
+        }
+
+        // Mouse events
+        talkButton.addEventListener('mousedown', startRecording);
+        talkButton.addEventListener('mouseup', stopRecording);
+        talkButton.addEventListener('mouseleave', stopRecording);
+
+        // Touch events
+        talkButton.addEventListener('touchstart', startRecording, { passive: false });
+        talkButton.addEventListener('touchend', stopRecording, { passive: false });
+        talkButton.addEventListener('touchcancel', stopRecording, { passive: false });
+
+        // Add these styles dynamically for mobile optimization
+        const style = document.createElement('style');
+        style.textContent = `
+            @media (max-width: 768px) {
+                #talk-button {
+                    width: 80px;
+                    height: 80px;
+                    font-size: 24px;
+                    -webkit-tap-highlight-color: transparent;
+                }
+
+                #talk-button.active {
+                    transform: scale(0.95);
+                    background-color: #e0e0e0;
+                }
+
+                #talk-button.long-press {
+                    background-color: #2196F3;
+                    color: white;
+                }
+
+                .selector-container {
+                    flex-direction: column;
+                    gap: 10px;
+                    padding: 10px;
+                }
+
+                #voice-select, #language-select {
+                    width: 100%;
+                    max-width: 300px;
+                    height: 40px;
+                    font-size: 16px;
+                }
+
+                #transcript, #gpt-response {
+                    font-size: 16px;
+                    padding: 15px;
+                    margin: 10px;
+                    max-height: 30vh;
+                }
+
+                #voice-wave {
+                    width: 60px;
+                    height: 60px;
+                }
+
+                #control-button, #stop-button {
+                    width: 50px;
+                    height: 50px;
+                    font-size: 20px;
+                }
+
+                .live-mode-container {
+                    padding: 10px;
+                }
+
+                #status {
+                    font-size: 14px;
+                    padding: 5px;
+                }
+            }
+
+            /* Prevent text selection during long press */
+            * {
+                -webkit-touch-callout: none;
+                -webkit-user-select: none;
+                user-select: none;
+            }
+
+            /* Allow text selection in response and transcript areas */
+            #transcript, #gpt-response {
+                -webkit-user-select: text;
+                user-select: text;
+            }
+
+            /* Add smooth transitions */
+            #talk-button {
+                transition: all 0.2s ease;
+            }
+
+            /* Add ripple effect */
+            .ripple {
+                position: relative;
+                overflow: hidden;
+            }
+
+            .ripple:after {
+                content: '';
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: rgba(255, 255, 255, 0.3);
+                border-radius: 50%;
+                transform: scale(0);
+                animation: ripple 0.6s linear;
+                top: 0;
+                left: 0;
+            }
+
+            @keyframes ripple {
+                to {
+                    transform: scale(2.5);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Add touch feedback function
+        function addTouchFeedback(element) {
+            element.addEventListener('touchstart', () => {
+                element.classList.add('ripple');
+            });
+            
+            element.addEventListener('touchend', () => {
+                setTimeout(() => {
+                    element.classList.remove('ripple');
+                }, 600);
+            });
+        }
+
+        // Add touch feedback to buttons
+        addTouchFeedback(talkButton);
+        addTouchFeedback(controlButton);
+        addTouchFeedback(stopButton);
+
+        // Add viewport meta tag for proper mobile scaling
+        if (!document.querySelector('meta[name="viewport"]')) {
+            const viewport = document.createElement('meta');
+            viewport.name = 'viewport';
+            viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            document.head.appendChild(viewport);
+        }
+
+        // Add scroll into view for mobile keyboards
+        const inputs = document.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            input.addEventListener('focus', () => {
+                setTimeout(() => {
+                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            });
         });
 
-        // Touch events for mobile
-        talkButton.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            stopSpeaking();
-            recognition.start();
-        });
-
-        talkButton.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            recognition.stop();
-        });
+        // Prevent zoom on double tap
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
 
     } else {
         alert('Speech recognition is not supported in this browser. Please use Chrome.');
