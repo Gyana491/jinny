@@ -884,49 +884,44 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     })();
 
-    // Enhanced User Context Manager
+    // Add these optimizations to UserContextManager
     const UserContextManager = {
-        // Constants for storage keys
         KEYS: {
             CONTEXT: 'jinny_user_context',
             PREFERENCES: 'jinny_preferences',
-            CONVERSATION_HISTORY: 'jinny_conversation_history',
-            USER_PROFILE: 'jinny_user_profile'
+            HISTORY: 'jinny_conversation_history'
         },
 
-        // Save context with specific type
         save: function(data, type = this.KEYS.CONTEXT) {
             try {
                 const storageData = {
-                    data: data,
-                    timestamp: Date.now(),
-                    type: type
+                    data,
+                    timestamp: Date.now()
                 };
                 localStorage.setItem(type, JSON.stringify(storageData));
-                console.log(`Saved ${type}:`, data);
+                // Immediately notify server of context update
+                socket.emit('update-context', data);
             } catch (error) {
-                console.error(`Error saving ${type}:`, error);
+                console.error('Error saving context:', error);
             }
         },
 
-        // Load context by type
         load: function(type = this.KEYS.CONTEXT) {
             try {
                 const saved = localStorage.getItem(type);
                 if (saved) {
                     const { data, timestamp } = JSON.parse(saved);
-                    // Only use data if it's less than 24 hours old
+                    // Only use if less than 24 hours old
                     if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
                         return data;
                     }
                 }
             } catch (error) {
-                console.error(`Error loading ${type}:`, error);
+                console.error('Error loading context:', error);
             }
             return null;
         },
 
-        // Update specific context type
         update: function(newData, type = this.KEYS.CONTEXT) {
             const currentData = this.load(type) || {};
             const updatedData = {
@@ -935,118 +930,130 @@ document.addEventListener('DOMContentLoaded', async () => {
                 lastUpdated: Date.now()
             };
             this.save(updatedData, type);
-        },
-
-        // Update user profile
-        updateProfile: function(profileData) {
-            const currentProfile = this.load(this.KEYS.USER_PROFILE) || {};
-            const updatedProfile = {
-                ...currentProfile,
-                ...profileData,
-                lastUpdated: Date.now()
-            };
-            this.save(updatedProfile, this.KEYS.USER_PROFILE);
-        },
-
-        // Add to conversation history
-        addToHistory: function(message, isUser = true) {
-            const history = this.load(this.KEYS.CONVERSATION_HISTORY) || [];
-            history.push({
-                content: message,
-                timestamp: Date.now(),
-                type: isUser ? 'user' : 'assistant'
+            
+            // Log context update
+            console.log('Context updated:', {
+                previous: currentData,
+                new: newData,
+                merged: updatedData
             });
-            // Keep only last 50 messages
-            if (history.length > 50) history.shift();
-            this.save(history, this.KEYS.CONVERSATION_HISTORY);
-        },
-
-        // Get user interests
-        getInterests: function() {
-            const profile = this.load(this.KEYS.USER_PROFILE) || {};
-            return profile.interests || [];
-        },
-
-        // Add user interest
-        addInterest: function(interest) {
-            const profile = this.load(this.KEYS.USER_PROFILE) || {};
-            profile.interests = profile.interests || [];
-            if (!profile.interests.includes(interest)) {
-                profile.interests.push(interest);
-                this.save(profile, this.KEYS.USER_PROFILE);
-            }
-        },
-
-        // Clear specific type of data
-        clear: function(type) {
-            if (type) {
-                localStorage.removeItem(type);
-            } else {
-                // Clear all Jinny related data
-                Object.values(this.KEYS).forEach(key => {
-                    localStorage.removeItem(key);
-                });
-            }
-        },
-
-        // Get all stored context
-        getAllContext: function() {
-            return {
-                context: this.load(this.KEYS.CONTEXT),
-                preferences: this.load(this.KEYS.PREFERENCES),
-                profile: this.load(this.KEYS.USER_PROFILE),
-                history: this.load(this.KEYS.CONVERSATION_HISTORY)
-            };
         }
     };
 
-    // Update socket handlers to use enhanced context
-    socket.on('update-user-context', (context) => {
-        // Update general context
-        UserContextManager.update(context);
-
-        // Extract and save user interests
-        if (context.interests) {
-            context.interests.forEach(interest => {
-                UserContextManager.addInterest(interest);
-            });
-        }
-
-        // Update user profile if relevant data exists
-        if (context.userProfile) {
-            UserContextManager.updateProfile(context.userProfile);
-        }
-    });
-
-    // Add conversation to history when sending/receiving messages
+    // Optimize socket response handling
     socket.on('gpt-response', async (data) => {
-        UserContextManager.addToHistory(data.text, false);
-        // ... rest of response handling
-    });
-
-    // When sending message
-    socket.emit('transcript', data => {
-        UserContextManager.addToHistory(data.final, true);
-    });
-
-    // Load context when page loads
-    document.addEventListener('DOMContentLoaded', () => {
-        const allContext = UserContextManager.getAllContext();
-        if (allContext.context || allContext.profile) {
-            // Emit saved context to server
-            socket.emit('load-context', allContext);
+        if (!data || !data.text) return;
+        
+        // Get user profile
+        const userProfile = getUserData('profile');
+        
+        // Replace placeholders with actual user name
+        const processedText = data.text.replace(/\[user\]/g, userProfile.name);
+        responseDiv.textContent = processedText;
+        
+        try {
+            await speak(processedText);
+        } catch (error) {
+            console.error('Speech error:', error);
         }
     });
 
-    // Sync context periodically
-    setInterval(() => {
-        const allContext = UserContextManager.getAllContext();
-        socket.emit('sync-context', allContext);
-    }, 5 * 60 * 1000); // Every 5 minutes
-
-    // Add cleanup on page unload
-    window.addEventListener('beforeunload', () => {
-        // Optionally clear temporary data
-        // UserContextManager.clear(UserContextManager.KEYS.CONTEXT);
+    // Add context to outgoing messages
+    socket.on('transcript', (data) => {
+        if (data.final) {
+            const context = {
+                profile: getUserData('profile'),
+                preferences: getUserData('preferences')
+            };
+            socket.emit('update-context', context);
+        }
     });
+
+    // Add these at the top of your script.js
+    const STORAGE_KEYS = {
+        USER_PROFILE: 'jinny_user_profile',
+        PREFERENCES: 'jinny_preferences',
+        HISTORY: 'jinny_conversation_history',
+        CONTEXT: 'jinny_context',
+        INTERESTS: 'jinny_interests'
+    };
+
+    // Initialize default user data
+    const DEFAULT_USER_DATA = {
+        profile: {
+            name: 'Gyana Ranjan',
+            created_at: Date.now(),
+            last_visit: Date.now()
+        },
+        preferences: {
+            language: 'en-GB',
+            theme: 'light',
+            voice_enabled: true
+        },
+        interests: [],
+        history: []
+    };
+
+    // Initialize context in localStorage if not exists
+    function initializeUserData() {
+        Object.entries(DEFAULT_USER_DATA).forEach(([key, value]) => {
+            const storageKey = STORAGE_KEYS[key.toUpperCase()];
+            if (!localStorage.getItem(storageKey)) {
+                localStorage.setItem(storageKey, JSON.stringify({
+                    data: value,
+                    timestamp: Date.now()
+                }));
+                console.log(`Initialized ${key}:`, value);
+            }
+        });
+    }
+
+    // Call this when the script loads
+    initializeUserData();
+
+    // Add this function to get user data
+    function getUserData(key) {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEYS[key.toUpperCase()]);
+            if (stored) {
+                const { data } = JSON.parse(stored);
+                return data;
+            }
+        } catch (error) {
+            console.error(`Error getting ${key}:`, error);
+        }
+        return DEFAULT_USER_DATA[key];
+    }
+
+    // Add this to verify the data is stored
+    console.log('Current User Profile:', getUserData('profile'));
+    console.log('Current Preferences:', getUserData('preferences'));
+
+    // Function to update user data
+    function updateUserData(key, newData) {
+        try {
+            const storageKey = STORAGE_KEYS[key.toUpperCase()];
+            const currentData = getUserData(key);
+            const updatedData = {
+                ...currentData,
+                ...newData,
+                last_updated: Date.now()
+            };
+            
+            localStorage.setItem(storageKey, JSON.stringify({
+                data: updatedData,
+                timestamp: Date.now()
+            }));
+            
+            console.log(`Updated ${key}:`, updatedData);
+            return updatedData;
+        } catch (error) {
+            console.error(`Error updating ${key}:`, error);
+            return null;
+        }
+    }
+
+    // Example usage:
+    // updateUserData('profile', { name: 'Gyana Ranjan', age: 25 });
+    // updateUserData('preferences', { language: 'hi-IN' });
 }); 

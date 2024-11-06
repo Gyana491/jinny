@@ -12,6 +12,11 @@ body {
     padding: 20px;
     color: #2c3e50;
 }
+@media (max-width: 768px) {
+    body {
+        padding: 0px;
+    }
+}
 
 .container {
     max-width: 900px;
@@ -20,6 +25,13 @@ body {
     padding: 30px;
     border-radius: 20px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+        border-radius: 0px;
+    }
+
 }
 
 /* Header Styles */
