@@ -1,5 +1,7 @@
 * 🤖 JINNY - Your Personal Voice Assistant & Learning Companion
 
+Live : [https://jinny.onrender.com/](https://jinny.onrender.com/)
+
 ## Created by Gyana Ranjan
 
 *Inspired by Iron Man's JARVIS*
@@ -32,6 +34,7 @@ Jinny isn't just another AI assistant - she's a personality with heart and soul 
 ## How Jinny Learns About You
 
 ### Personalization Features:
+
 - 📝 Conversation Memory: Maintains context from previous chats
 - 🎵 Music Taste Learning: Remembers your favorite genres and songs
 - 📅 Schedule Adaptation: Learns your daily routines and preferences
