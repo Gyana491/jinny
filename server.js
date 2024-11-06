@@ -109,7 +109,7 @@ io.on('connection', (socket) => {
                     messages: messages,
                     model: "gpt-3.5-turbo-16k",
                     temperature: 0.7,
-                    max_tokens: 150, // Reduced for efficiency
+                    max_tokens: 700, // Reduced for efficiency
                     presence_penalty: 0.6,
                     frequency_penalty: 0.3,
                     top_p: 0.9,
