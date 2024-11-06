@@ -27,13 +27,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     liveModeToggle.addEventListener('change', (e) => {
         isLiveMode = e.target.checked;
         if (isLiveMode) {
-            showStartButton();
-            // Automatically start live mode
             startLiveMode();
-            showStopButton();
         } else {
             stopLiveMode();
-            hideControlButtons();
         }
     });
 
@@ -44,9 +40,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             recognition.continuous = true;
             recognition.interimResults = true;
-            recognition.start();
+            
+            // Only start microphone if not speaking
+            if (!isSpeaking) {
+                recognition.start();
+                isListening = true;
+            }
+            
             voiceWave.classList.add('speaking');
-            statusDiv.innerHTML = '<span style="color: green;"><i class="fas fa-broadcast-tower"></i> Live Mode Active</span>';
+            updateStatus('live');
             isLiveStarted = true;
         } catch (error) {
             console.error('Error starting live mode:', error);
@@ -56,16 +58,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     function stopLiveMode() {
         if (!recognition) return;
         
-        // Reset recognition settings
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        
         try {
+            recognition.continuous = false;
+            recognition.interimResults = true;
             recognition.stop();
-            statusDiv.innerHTML = '<span style="color: blue;"><i class="fas fa-microphone"></i> Ready</span>';
+            isListening = false;
             voiceWave.classList.remove('speaking');
             isLiveStarted = false;
-            stopSpeaking();
+            
+            if (isSpeaking) {
+                window.speechSynthesis.cancel();
+                isSpeaking = false;
+                isPaused = false;
+            }
+            updateStatus('ready');
         } catch (error) {
             console.error('Error stopping live mode:', error);
         }
@@ -244,26 +250,59 @@ document.addEventListener('DOMContentLoaded', async () => {
                 recognition.stop();
                 isListening = false;
                 console.log('Microphone turned off');
-            } else if (action === 'start') {
-                // Only start if we're in live mode and Jinny isn't speaking
-                if (isLiveMode && !isSpeaking) {
-                    recognition.start();
-                    isListening = true;
-                    console.log('Microphone turned on');
-                }
+            } else if (action === 'start' && isLiveMode) {
+                recognition.start();
+                isListening = true;
+                console.log('Microphone turned on');
             }
         } catch (error) {
             console.error('Microphone control error:', error);
         }
     }
 
-    // Update the speak function
+    // Add these variables at the top of your script
+    let currentUtterance = null;
+    let pausedText = '';
+    let pausedIndex = 0;
+    let isLiveStarted = false;
+
+    // Update status display function
+    function updateStatus(state, message) {
+        switch (state) {
+            case 'ready':
+                statusDiv.innerHTML = '<span style="color: blue;"><i class="fas fa-microphone"></i> Ready</span>';
+                break;
+            case 'listening':
+                statusDiv.innerHTML = '<span style="color: green;"><i class="fas fa-microphone-alt"></i> Listening...</span>';
+                break;
+            case 'speaking':
+                statusDiv.innerHTML = '<span style="color: purple;"><i class="fas fa-comment-dots"></i> Speaking...</span>';
+                break;
+            case 'paused':
+                statusDiv.innerHTML = '<span style="color: orange;"><i class="fas fa-pause"></i> Paused</span>';
+                break;
+            case 'live':
+                statusDiv.innerHTML = '<span style="color: green;"><i class="fas fa-broadcast-tower"></i> Live Mode Active</span>';
+                break;
+            case 'processing':
+                statusDiv.innerHTML = message || '<span style="color: blue;"><i class="fas fa-cog fa-spin"></i> Processing...</span>';
+                break;
+            default:
+                statusDiv.innerHTML = message || '<span style="color: blue;"><i class="fas fa-microphone"></i> Ready</span>';
+        }
+    }
+
+    // Update the speak function with better status handling
     function speak(text) {
         return new Promise((resolve) => {
-            // Always turn off microphone before speaking
+            if (isSpeaking) {
+                window.speechSynthesis.cancel();
+            }
+
             manageMicrophone('stop');
 
             const utterance = new SpeechSynthesisUtterance(text);
+            currentUtterance = utterance;
             
             if (selectedVoice) {
                 utterance.voice = selectedVoice;
@@ -272,29 +311,54 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             utterance.onstart = () => {
                 isSpeaking = true;
-                // Ensure microphone stays off while speaking
+                isPaused = false;
+                voiceWave.classList.add('speaking');
+                updateStatus('speaking');
                 manageMicrophone('stop');
-                console.log('Speaking started');
+            };
+
+            utterance.onpause = () => {
+                isPaused = true;
+                updateStatus('paused');
+            };
+
+            utterance.onresume = () => {
+                isPaused = false;
+                updateStatus('speaking');
+                manageMicrophone('stop');
             };
 
             utterance.onend = () => {
                 isSpeaking = false;
-                console.log('Speaking ended');
-                // Only turn microphone back on in live mode
-                setTimeout(() => {
-                    if (isLiveMode) {
+                isPaused = false;
+                currentUtterance = null;
+                voiceWave.classList.remove('speaking');
+                
+                // Update status based on mode
+                if (isLiveMode) {
+                    updateStatus('live');
+                    setTimeout(() => {
                         manageMicrophone('start');
-                    }
-                }, 100);
+                    }, 300);
+                } else {
+                    updateStatus('ready');
+                }
                 resolve();
             };
 
             utterance.onerror = (error) => {
                 console.error('Speech error:', error);
                 isSpeaking = false;
-                // Only turn microphone back on in live mode
+                isPaused = false;
+                currentUtterance = null;
+                
                 if (isLiveMode) {
-                    manageMicrophone('start');
+                    updateStatus('live');
+                    setTimeout(() => {
+                        manageMicrophone('start');
+                    }, 300);
+                } else {
+                    updateStatus('ready');
                 }
                 resolve();
             };
@@ -319,26 +383,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         recognition.onstart = () => {
-            stopSpeaking();
             isListening = true;
             voiceWave.classList.add('speaking');
-            statusDiv.innerHTML = '<span style="color: green;"><i class="fas fa-microphone"></i> Listening...</span>';
+            updateStatus(isLiveMode ? 'live' : 'listening');
             talkButton.classList.add('listening');
         };
 
         recognition.onend = () => {
             isListening = false;
-            
             if (isLiveMode && isLiveStarted && !isSpeaking) {
-                // Only restart recognition if Jinny isn't speaking
                 try {
                     recognition.start();
                 } catch (error) {
                     console.error('Error restarting recognition:', error);
                 }
             } else {
-                statusDiv.innerHTML = '<span style="color: blue;"><i class="fas fa-microphone"></i> Ready</span>';
                 talkButton.classList.remove('listening');
+                if (!isSpeaking) {
+                    updateStatus('ready');
+                }
             }
         };
 
@@ -351,9 +414,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 clearTimeout(silenceTimer);
             }
 
+            // Show listening status when user is speaking
+            if (isLiveMode) {
+                updateStatus('listening');
+            }
+
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 const transcript = event.results[i][0].transcript;
-                if (event.results[i].isFinal && transcript.trim().length > 0) {  // Only process non-empty transcripts
+                if (event.results[i].isFinal && transcript.trim().length > 0) {
                     finalTranscript += transcript + ' ';
                     
                     // Stop current speech if Jinny is speaking
@@ -367,7 +435,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             final: transcript.trim(),
                             interim: ''
                         });
-                        statusDiv.innerHTML = '<span style="color: blue;"><i class="fas fa-cog fa-spin"></i> Processing...</span>';
+                        updateStatus('processing', '<span style="color: blue;"><i class="fas fa-cog fa-spin"></i> Processing...</span>');
                     }
                 } else {
                     interimTranscript += transcript;
@@ -387,7 +455,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Reset silence timer
             if (isLiveMode) {
                 silenceTimer = setTimeout(() => {
-                    statusDiv.innerHTML = '<span style="color: green;"><i class="fas fa-broadcast-tower"></i> Live Mode Active</span>';
+                    if (!isSpeaking) {
+                        updateStatus('live');
+                    }
                 }, SILENCE_THRESHOLD);
             }
         };
@@ -677,41 +747,89 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Add control button event listener
+    // Update the control button handlers
+    function showPlayButton() {
+        // Just update status without showing control button
+        statusDiv.innerHTML = '<span style="color: orange;"><i class="fas fa-pause"></i> Paused</span>';
+    }
+
+    function showPauseButton() {
+        // Just update status without showing control button
+        statusDiv.innerHTML = '<span style="color: purple;"><i class="fas fa-comment-dots"></i> Speaking...</span>';
+    }
+
+    function hideControlButtons() {
+        // This can be empty now or used for other cleanup
+    }
+
+    // Update the control button click handler
     controlButton.addEventListener('click', () => {
-        if (isLiveMode) {
-            if (!isLiveStarted) {
-                startLiveMode();
-                showStopButton();
-            } else {
-                stopLiveMode();
-                showStartButton();
-            }
+        if (!isSpeaking && !isPaused) return;
+
+        if (isPaused) {
+            window.speechSynthesis.resume();
+            isPaused = false;
+            showPauseButton();
         } else {
-            // Regular play/pause functionality
-            togglePlayPause();
+            window.speechSynthesis.pause();
+            isPaused = true;
+            showPlayButton();
         }
     });
 
-    // Add this function to toggle play/pause
-    function togglePlayPause() {
+    // Add this function to keep the speech synthesis state in sync
+    function syncSpeechState() {
         if (isSpeaking) {
-            if (isPaused) {
-                window.speechSynthesis.resume();
-                controlButton.innerHTML = '<i class="fas fa-pause"></i>';
-                isPaused = false;
-            } else {
-                window.speechSynthesis.pause();
-                controlButton.innerHTML = '<i class="fas fa-play"></i>';
+            if (window.speechSynthesis.paused) {
                 isPaused = true;
+                showPlayButton();
+            } else {
+                isPaused = false;
+                showPauseButton();
             }
         }
     }
 
-    // Add stop button event listener
+    // Call syncSpeechState more frequently for better responsiveness
+    setInterval(syncSpeechState, 100);
+
+    // Update cleanup function with microphone control
+    function cleanup() {
+        if (isSpeaking) {
+            window.speechSynthesis.cancel();
+        }
+        isSpeaking = false;
+        isPaused = false;
+        currentUtterance = null;
+        
+        if (isLiveMode) {
+            setTimeout(() => {
+                manageMicrophone('start');
+                updateStatus('live');
+            }, 300);
+        } else {
+            manageMicrophone('stop');
+            updateStatus('ready');
+        }
+    }
+
+    // Add event listeners for page visibility changes
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            cleanup();
+        }
+    });
+
+    // Update the stop button handler
     stopButton.addEventListener('click', () => {
-        stopSpeaking();
-        toggleControlButton(false);
+        cleanup();
+    });
+
+    // Add this to handle Chrome's speech synthesis bugs
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && isSpeaking && isPaused) {
+            window.speechSynthesis.resume();
+        }
     });
 
     // Add these functions for better control
@@ -729,19 +847,40 @@ document.addEventListener('DOMContentLoaded', async () => {
         isLiveStarted = true;
     }
 
-    function showPauseButton() {
-        if (!isLiveMode) {
-            controlButton.style.display = 'flex';
-            controlButton.innerHTML = '<i class="fas fa-pause"></i>';
-            controlButton.classList.add('visible');
-            controlButton.classList.remove('live-active');
-        }
-    }
+    // Initialize voice as soon as possible
+    (function initializeVoiceEarly() {
+        if (typeof speechSynthesis !== 'undefined') {
+            // Show loading indicator
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'loading-voice';
+            loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initializing voice...';
+            document.body.appendChild(loadingDiv);
 
-    function hideControlButtons() {
-        controlButton.classList.remove('visible');
-        setTimeout(() => {
-            controlButton.style.display = 'none';
-        }, 200);
-    }
+            // Try to initialize voices
+            function tryInitVoices() {
+                const voices = speechSynthesis.getVoices();
+                if (voices.length > 0) {
+                    selectedVoice = voices.find(voice => 
+                        voice.name.includes('Google') && 
+                        voice.lang === 'hi-IN'
+                    ) || voices.find(voice => 
+                        voice.lang === 'hi-IN'
+                    ) || voices[0];
+                    
+                    // Remove loading indicator
+                    loadingDiv.remove();
+                    return true;
+                }
+                return false;
+            }
+
+            // Try immediate initialization
+            if (!tryInitVoices()) {
+                // If not successful, wait for voices to load
+                speechSynthesis.onvoiceschanged = () => {
+                    tryInitVoices();
+                };
+            }
+        }
+    })();
 }); 
