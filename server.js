@@ -107,9 +107,9 @@ io.on('connection', (socket) => {
 
                 const completion = await openai.chat.completions.create({
                     messages: messages,
-                    model: "gpt-3.5-turbo-16k",
+                    model: process.env.OPENAI_MODEL || "gpt-3.5-turbo-16k",
                     temperature: 0.7,
-                    max_tokens: 700, // Reduced for efficiency
+                    max_tokens: parseInt(process.env.OPENAI_MAX_TOKENS) || 700, 
                     presence_penalty: 0.6,
                     frequency_penalty: 0.3,
                     top_p: 0.9,
