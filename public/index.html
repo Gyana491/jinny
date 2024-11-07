@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Add Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="assets/jinnyfavicon.png">
 </head>
 <body>
     <div class="container">
@@ -30,13 +31,20 @@
 
         <!-- Hidden selectors -->
         <div class="selector-container" style="display: none;">
-            <div class="voice-selector">
-                <select id="voice-select"></select>
+            
+            <div class="selector-group">
+                <label for="language-select">Select Input Language</label>
+                <div class="language-selector">
+                    <select id="language-select">
+                        <option value="en-GB" selected>🇬🇧 English (UK)</option>
+                    </select>
+                </div>
             </div>
-            <div class="language-selector">
-                <select id="language-select">
-                    <option value="en-GB" selected>🇬🇧 English (UK)</option>
-                </select>
+            <div class="selector-group">
+                <label for="voice-select">Select Voice Output</label>
+                <div class="voice-selector">
+                    <select id="voice-select"></select>
+                </div>
             </div>
         </div>
 
@@ -107,5 +115,6 @@
     </div>
     <script src="/socket.io/socket.io.js"></script>
     <script src="script.js"></script>
+    <!-- <script src="js/location.js"></script> -->
 </body>
 </html> 
