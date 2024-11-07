@@ -104,7 +104,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         'bn-IN': { flag: '🇮🇳', name: 'বাংলা' },
         'ta-IN': { flag: '🇮🇳', name: 'தமிழ்' },
         'te-IN': { flag: '🇮🇳', name: 'తెలుగు' },
-        'mr-IN': { flag: '🇮🇳', name: 'मराठी' }
+        'mr-IN': { flag: '🇮🇳', name: 'मराठी' },
+        'or-IN': { flag: '🇮🇳', name: 'ଓଡ଼ିଆ' },
+        'or': { flag: '🇮🇳', name: 'ଓଡ଼ିଆ' } // Generic Odia fallback
     };
 
     // Helper function to get language code from full locale
