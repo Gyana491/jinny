@@ -94,6 +94,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
+    // Add these helper functions near the top of your script
+    const languageMap = {
+        'en-GB': { flag: '🇬🇧', name: 'English' },
+        'en-US': { flag: '🇺🇸', name: 'English' },
+        'en': { flag: '🇬🇧', name: 'English' }, // Generic English fallback
+        'hi-IN': { flag: '🇮🇳', name: 'हिन्दी' },
+        'hi': { flag: '🇮🇳', name: 'हिन्दी' }, // Generic Hindi fallback
+        'bn-IN': { flag: '🇮🇳', name: 'বাংলা' },
+        'ta-IN': { flag: '🇮🇳', name: 'தமிழ்' },
+        'te-IN': { flag: '🇮🇳', name: 'తెలుగు' },
+        'mr-IN': { flag: '🇮🇳', name: 'मराठी' }
+    };
+
+    // Helper function to get language code from full locale
+    function getBaseLanguageCode(fullCode) {
+        // First try the full code
+        if (languageMap[fullCode]) {
+            return fullCode;
+        }
+        // Then try the base language code
+        const baseCode = fullCode.split('-')[0];
+        return languageMap[baseCode] ? baseCode : fullCode;
+    }
+
+    // Update the language display function
+    function updateLanguageDisplay() {
+        const inputLang = recognition ? recognition.lang : 'en-GB';
+        const outputLang = selectedVoice ? selectedVoice.lang : 'hi-IN';
+        
+        // console.log('Current voice:', selectedVoice); // Debug log
+        // console.log('Output language:', outputLang); // Debug log
+        
+        const inputCode = getBaseLanguageCode(inputLang);
+        const outputCode = outputLang;
+        
+        const inputInfo = inputCode ? `${inputCode}` :"unknown";
+        const outputInfo = outputCode ? `${outputCode}` :"unknown";
+        
+        const displayElement = document.getElementById('languageDisplay');
+        if (displayElement) {
+            displayElement.textContent = `${inputInfo} → ${outputInfo} `;
+            // console.log('Updated language display:', displayElement.textContent); // Debug log
+        }
+    }
+
     // Voice initialization with selection options
     async function initVoice() {
         return new Promise((resolve) => {
@@ -111,15 +156,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 voices.forEach((voice) => {
                     const option = document.createElement('option');
                     option.value = voice.name;
-                    option.textContent = `${voice.name} (${voice.lang})`;
-                    
-                    // Add flags for languages
-                    if (voice.lang.startsWith('hi')) {
-                        option.textContent = '🇮🇳 ' + option.textContent;
-                    } else if (voice.lang.startsWith('en')) {
-                        option.textContent = '🇬🇧 ' + option.textContent;
-                    }
-                    
+                    const langCode = getBaseLanguageCode(voice.lang);
+                    const langInfo = languageMap[langCode] || { flag: '🌐', name: 'Unknown' };
+                    option.textContent = `${langInfo.flag} ${voice.name} (${voice.lang})`;
                     voiceSelect.appendChild(option);
                 });
 
@@ -137,9 +176,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!selectedVoice) {
                     selectedVoice = voices.find(voice => 
                         voice.name.includes('Google') && 
-                        voice.lang === 'hi-IN'
+                        voice.lang.startsWith('hi')
                     ) || voices.find(voice => 
-                        voice.lang === 'hi-IN'
+                        voice.lang.startsWith('hi')
                     ) || voices[0];
 
                     if (selectedVoice) {
@@ -148,7 +187,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 console.log('Voice initialized:', selectedVoice?.name);
+                console.log('Voice language:', selectedVoice?.lang);
                 console.log('Available voices:', voices.length);
+
+                // Update language display after voices are initialized
+                updateLanguageDisplay();
                 resolve(true);
             }
 
@@ -170,6 +213,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const voices = window.speechSynthesis.getVoices();
         selectedVoice = voices.find(voice => voice.name === e.target.value);
         
+        console.log('Selected voice:', selectedVoice); // Debug log
+        console.log('Voice language:', selectedVoice?.lang); // Debug log
+        
         // Test the selected voice
         const testUtterance = new SpeechSynthesisUtterance('Testing voice change');
         testUtterance.voice = selectedVoice;
@@ -178,6 +224,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Save preference
         savePreferences();
         
+        // Update language display
+        updateLanguageDisplay();
+        
         console.log('Voice changed to:', selectedVoice.name);
     });
 
@@ -185,6 +234,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     languageSelect.addEventListener('change', (e) => {
         recognition.lang = e.target.value;
         savePreferences();
+        
+        // Update language display
+        updateLanguageDisplay();
+        
         console.log('Recognition language changed to:', e.target.value);
     });
 
