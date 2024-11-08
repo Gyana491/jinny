@@ -1034,3 +1034,56 @@ html {
         border-radius: 50%;
     }
 }
+
+.model-selector select {
+    width: 100%;
+    padding: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-family: 'Poppins', sans-serif;
+    background-color: white;
+}
+
+.model-selector {
+    margin-bottom: 1rem;
+}
+
+.model-badge {
+    padding: 8px 20px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50px;
+    font-size: 0.9rem;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+.model-badge i {
+    font-size: 1.1rem;
+}
+
+/* Update the model selector styles */
+.model-selector select {
+    width: 100%;
+    padding: 0.8rem;
+    border-radius: 8px;
+    border: 1px solid var(--primary-light);
+    font-family: 'Poppins', sans-serif;
+    background-color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.model-selector select:hover {
+    border-color: var(--primary-color);
+}
+
+.model-selector select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(156, 39, 176, 0.1);
+}

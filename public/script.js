@@ -13,9 +13,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isSpeaking = false;
     let selectedVoice = null;
     let isPaused = false;
+    let selectedAiModel = null;
+    let isLiveStarted = false;
 
     const voiceSelect = document.getElementById('voice-select');
     const languageSelect = document.getElementById('language-select');
+    const modelSelect = document.getElementById('model-select');
+
 
     // Add these variables at the top
     const liveModeToggle = document.getElementById('liveMode');
@@ -85,12 +89,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (recognition) {
             localStorage.setItem('selectedLanguage', recognition.lang);
         }
+        if (selectedAiModel) {
+            localStorage.setItem('selectedAiModel', selectedAiModel);
+        }
     }
 
     function loadPreferences() {
+        selectedAiModel = localStorage.getItem('selectedAiModel') || 'llama-3.1-70b-versatile';
         return {
             voiceName: localStorage.getItem('selectedVoiceName'),
-            language: localStorage.getItem('selectedLanguage') || 'en-GB'
+            language: localStorage.getItem('selectedLanguage') || 'en-GB',
+            aiModel: localStorage.getItem('selectedAiModel') || 'llama-3.1-70b-versatile'
         };
     }
 
@@ -138,6 +147,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (displayElement) {
             displayElement.textContent = `${inputInfo} → ${outputInfo} `;
             // console.log('Updated language display:', displayElement.textContent); // Debug log
+        }
+    }
+
+    function updateModelDisplay() {
+        const displayElement = document.getElementById('modelDisplay');
+        if (displayElement) {
+            displayElement.textContent = `${selectedAiModel}`;
         }
     }
 
@@ -242,6 +258,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         console.log('Recognition language changed to:', e.target.value);
     });
+    modelSelect.addEventListener('change', (e) => {
+        selectedAiModel = e.target.value;
+        savePreferences();
+        updateModelDisplay();
+        console.log('AI model changed to:', selectedAiModel);
+    });
 
     // Add language options
     const languages = [
@@ -262,6 +284,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         languageSelect.appendChild(option);
     });
 
+    // Add language options
+    const models = [
+        { model: 'llama-3.1-70b-versatile',  name: 'Llama 3.1 (70B)' },
+        {model: 'gpt-3.5-turbo-16k', name: 'GPT-3.5 Turbo (16K)'},
+        
+    ]
+
+    // Populate language selector
+    models.forEach(model => {
+        const option = document.createElement('option');
+        option.value = model.model;
+        option.textContent = `${model.name}`;
+        modelSelect.appendChild(option);
+    });
+
+    function initAiModel() {
+        const prefs = loadPreferences();
+        if (prefs.aiModel) {
+            selectedAiModel = prefs.aiModel;
+            modelSelect.value = selectedAiModel;
+        }
+        updateModelDisplay();
+
+    }
+    initAiModel();
+
+
     // Show the selector container
     document.querySelector('.selector-container').style.display = 'flex';
 
@@ -272,10 +321,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             isSpeaking = false;
             isPaused = false;
             voiceWave.classList.remove('speaking');
-            statusDiv.innerHTML = '<span style="color: blue;"><i class="fas fa-microphone"></i> Ready</span>';
-            if (!isSpeaking) {
-                toggleControlButton(false);
-            }
+            updateStatus('ready');
         }
     }
 
@@ -315,11 +361,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Add these variables at the top of your script
-    let currentUtterance = null;
-    let pausedText = '';
-    let pausedIndex = 0;
-    let isLiveStarted = false;
+
+    
 
     // Update status display function
     function updateStatus(state, message) {
@@ -337,7 +380,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 statusDiv.innerHTML = '<span style="color: orange;"><i class="fas fa-pause"></i> Paused</span>';
                 break;
             case 'live':
-                statusDiv.innerHTML = '<span style="color: green;"><i class="fas fa-broadcast-tower"></i> Live Mode Active</span>';
+                statusDiv.innerHTML = '<span style="color: green; white-space: nowrap;"><i class="fas fa-broadcast-tower"></i> Live Mode Active</span>';
                 break;
             case 'processing':
                 statusDiv.innerHTML = message || '<span style="color: blue;"><i class="fas fa-cog fa-spin"></i> Processing...</span>';
@@ -476,6 +519,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 const transcript = event.results[i][0].transcript;
+                
                 if (event.results[i].isFinal && transcript.trim().length > 0) {
                     finalTranscript += transcript + ' ';
                     
@@ -486,10 +530,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     // Send transcript immediately when in live mode
                     if (isLiveMode) {
-                        socket.emit('transcript', {
+                        console.log('Emitting transcript (live mode):', {
+                            model: selectedAiModel,
                             final: transcript.trim(),
                             interim: ''
                         });
+                        socket.emit('transcript', {
+                            model: selectedAiModel,
+                            final: transcript.trim(),
+                            interim: ''
+                        });
+                        
                         updateStatus('processing', '<span style="color: blue;"><i class="fas fa-cog fa-spin"></i> Processing...</span>');
                     }
                 } else {
@@ -499,9 +550,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // For non-live mode, send complete transcript
             if (!isLiveMode && finalTranscript.trim()) {
+                console.log('Emitting transcript (normal mode):', {
+                    final: finalTranscript.trim(),
+                    interim: interimTranscript,
+                    model: selectedAiModel
+                });
                 socket.emit('transcript', {
-                    final: finalTranscript,
-                    interim: interimTranscript
+                    final: finalTranscript.trim(),
+                    interim: interimTranscript,
+                    model: selectedAiModel
                 });
             }
 
@@ -524,26 +581,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             try {
                 voiceWave.classList.add('speaking');
-                statusDiv.innerHTML = '<span style="color: purple;"><i class="fas fa-comment-dots"></i> Speaking...</span>';
-                
-                if (!isLiveMode) {
-                    showPauseButton();
-                }
-                
+                updateStatus('speaking');
                 // Turn off microphone before speaking
                 manageMicrophone('stop');
                 await speak(data.text);
                 
                 if (isLiveMode) {
-                    statusDiv.innerHTML = '<span style="color: green;"><i class="fas fa-broadcast-tower"></i> Live Mode Active</span>';
+                    updateStatus('live');
                     // Turn microphone back on in live mode
                     manageMicrophone('start');
                 } else {
-                    statusDiv.innerHTML = '<span style="color: blue;"><i class="fas fa-microphone"></i> Ready</span>';
+                    updateStatus('ready');
                     if (!isSpeaking && !isListening) {
                         setTimeout(() => {
                             voiceWave.classList.remove('speaking');
-                            hideControlButtons();
+                            
                         }, 1000);
                     }
                 }
@@ -552,7 +604,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (isLiveMode) {
                     manageMicrophone('start');
                 }
-                hideControlButtons();
+                
             }
         });
 
@@ -615,114 +667,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         talkButton.addEventListener('touchstart', startRecording, { passive: false });
         talkButton.addEventListener('touchend', stopRecording, { passive: false });
         talkButton.addEventListener('touchcancel', stopRecording, { passive: false });
-
-        // Add these styles dynamically for mobile optimization
-        const style = document.createElement('style');
-        style.textContent = `
-            @media (max-width: 768px) {
-                #talk-button {
-                    width: 80px;
-                    height: 80px;
-                    font-size: 24px;
-                    -webkit-tap-highlight-color: transparent;
-                }
-
-                #talk-button.active {
-                    transform: scale(0.95);
-                    background-color: #e0e0e0;
-                }
-
-                #talk-button.long-press {
-                    background-color: #2196F3;
-                    color: white;
-                }
-
-                .selector-container {
-                    flex-direction: column;
-                    gap: 10px;
-                    padding: 10px;
-                }
-
-                #voice-select, #language-select {
-                    width: 100%;
-                    max-width: 300px;
-                    height: 40px;
-                    font-size: 16px;
-                }
-
-                #transcript, #gpt-response {
-                    font-size: 16px;
-                    padding: 15px;
-                    margin: 10px;
-                    max-height: 30vh;
-                }
-
-                #voice-wave {
-                    width: 60px;
-                    height: 60px;
-                }
-
-                #control-button, #stop-button {
-                    width: 50px;
-                    height: 50px;
-                    font-size: 20px;
-                }
-
-                .live-mode-container {
-                    padding: 10px;
-                }
-
-                #status {
-                    font-size: 14px;
-                    padding: 5px;
-                }
-            }
-
-            /* Prevent text selection during long press */
-            * {
-                -webkit-touch-callout: none;
-                -webkit-user-select: none;
-                user-select: none;
-            }
-
-            /* Allow text selection in response and transcript areas */
-            #transcript, #gpt-response {
-                -webkit-user-select: text;
-                user-select: text;
-            }
-
-            /* Add smooth transitions */
-            #talk-button {
-                transition: all 0.2s ease;
-            }
-
-            /* Add ripple effect */
-            .ripple {
-                position: relative;
-                overflow: hidden;
-            }
-
-            .ripple:after {
-                content: '';
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                background: rgba(255, 255, 255, 0.3);
-                border-radius: 50%;
-                transform: scale(0);
-                animation: ripple 0.6s linear;
-                top: 0;
-                left: 0;
-            }
-
-            @keyframes ripple {
-                to {
-                    transform: scale(2.5);
-                    opacity: 0;
-                }
-            }
-        `;
-        document.head.appendChild(style);
 
         // Add touch feedback function
         function addTouchFeedback(element) {
@@ -787,66 +731,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     setInterval(keepSpeaking, 1000);
 
-    // Update the toggleControlButton function
-    function toggleControlButton(show) {
-        if (show) {
-            controlButton.style.display = 'flex';
-            controlButton.classList.add('visible');
-            controlButton.innerHTML = '<i class="fas fa-pause"></i>';
-            isPaused = false;
-        } else {
-            controlButton.classList.remove('visible');
-            if (!isSpeaking) {
-                controlButton.style.display = 'none';
-            }
-        }
-    }
-
-    // Update the control button handlers
-    function showPlayButton() {
-        // Just update status without showing control button
-        statusDiv.innerHTML = '<span style="color: orange;"><i class="fas fa-pause"></i> Paused</span>';
-    }
-
-    function showPauseButton() {
-        // Just update status without showing control button
-        statusDiv.innerHTML = '<span style="color: purple;"><i class="fas fa-comment-dots"></i> Speaking...</span>';
-    }
-
-    function hideControlButtons() {
-        // This can be empty now or used for other cleanup
-    }
-
-    // Update the control button click handler
-    controlButton.addEventListener('click', () => {
-        if (!isSpeaking && !isPaused) return;
-
-        if (isPaused) {
-            window.speechSynthesis.resume();
-            isPaused = false;
-            showPauseButton();
-        } else {
-            window.speechSynthesis.pause();
-            isPaused = true;
-            showPlayButton();
-        }
-    });
-
-    // Add this function to keep the speech synthesis state in sync
-    function syncSpeechState() {
-        if (isSpeaking) {
-            if (window.speechSynthesis.paused) {
-                isPaused = true;
-                showPlayButton();
-            } else {
-                isPaused = false;
-                showPauseButton();
-            }
-        }
-    }
-
-    // Call syncSpeechState more frequently for better responsiveness
-    setInterval(syncSpeechState, 100);
 
     // Update cleanup function with microphone control
     function cleanup() {
@@ -875,10 +759,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Update the stop button handler
-    stopButton.addEventListener('click', () => {
-        cleanup();
-    });
 
     // Add this to handle Chrome's speech synthesis bugs
     document.addEventListener('visibilitychange', () => {
@@ -887,228 +767,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Add these functions for better control
-    function showStartButton() {
-        controlButton.style.display = 'flex';
-        controlButton.innerHTML = '<i class="fas fa-play"></i>';
-        controlButton.classList.add('visible');
-        controlButton.classList.remove('live-active');
-        isLiveStarted = false;
-    }
 
-    function showStopButton() {
-        controlButton.innerHTML = '<i class="fas fa-stop"></i>';
-        controlButton.classList.add('visible', 'live-active');
-        isLiveStarted = true;
-    }
-
-    // Initialize voice as soon as possible
-    (function initializeVoiceEarly() {
-        if (typeof speechSynthesis !== 'undefined') {
-            // Show loading indicator
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'loading-voice';
-            loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initializing voice...';
-            document.body.appendChild(loadingDiv);
-
-            // Try to initialize voices
-            function tryInitVoices() {
-                const voices = speechSynthesis.getVoices();
-                if (voices.length > 0) {
-                    selectedVoice = voices.find(voice => 
-                        voice.name.includes('Google') && 
-                        voice.lang === 'hi-IN'
-                    ) || voices.find(voice => 
-                        voice.lang === 'hi-IN'
-                    ) || voices[0];
-                    
-                    // Remove loading indicator
-                    loadingDiv.remove();
-                    return true;
-                }
-                return false;
-            }
-
-            // Try immediate initialization
-            if (!tryInitVoices()) {
-                // If not successful, wait for voices to load
-                speechSynthesis.onvoiceschanged = () => {
-                    tryInitVoices();
-                };
-            }
-        }
-    })();
-
-    // Add these optimizations to UserContextManager
-    const UserContextManager = {
-        KEYS: {
-            CONTEXT: 'jinny_user_context',
-            PREFERENCES: 'jinny_preferences',
-            HISTORY: 'jinny_conversation_history'
-        },
-
-        save: function(data, type = this.KEYS.CONTEXT) {
-            try {
-                const storageData = {
-                    data,
-                    timestamp: Date.now()
-                };
-                localStorage.setItem(type, JSON.stringify(storageData));
-                // Immediately notify server of context update
-                socket.emit('update-context', data);
-            } catch (error) {
-                console.error('Error saving context:', error);
-            }
-        },
-
-        load: function(type = this.KEYS.CONTEXT) {
-            try {
-                const saved = localStorage.getItem(type);
-                if (saved) {
-                    const { data, timestamp } = JSON.parse(saved);
-                    // Only use if less than 24 hours old
-                    if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
-                        return data;
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading context:', error);
-            }
-            return null;
-        },
-
-        update: function(newData, type = this.KEYS.CONTEXT) {
-            const currentData = this.load(type) || {};
-            const updatedData = {
-                ...currentData,
-                ...newData,
-                lastUpdated: Date.now()
-            };
-            this.save(updatedData, type);
-            
-            // Log context update
-            console.log('Context updated:', {
-                previous: currentData,
-                new: newData,
-                merged: updatedData
-            });
-        }
-    };
-
-    // Optimize socket response handling
-    socket.on('gpt-response', async (data) => {
-        if (!data || !data.text) return;
-        
-        // Get user profile
-        const userProfile = getUserData('profile');
-        
-        // Replace placeholders with actual user name
-        const processedText = data.text.replace(/\[user\]/g, userProfile.name);
-        responseDiv.textContent = processedText;
-        
-        try {
-            await speak(processedText);
-        } catch (error) {
-            console.error('Speech error:', error);
-        }
-    });
-
-    // Add context to outgoing messages
-    socket.on('transcript', (data) => {
-        if (data.final) {
-            const context = {
-                profile: getUserData('profile'),
-                preferences: getUserData('preferences')
-            };
-            socket.emit('update-context', context);
-        }
-    });
-
-    // Add these at the top of your script.js
-    const STORAGE_KEYS = {
-        USER_PROFILE: 'jinny_user_profile',
-        PREFERENCES: 'jinny_preferences',
-        HISTORY: 'jinny_conversation_history',
-        CONTEXT: 'jinny_context',
-        INTERESTS: 'jinny_interests'
-    };
-
-    // Initialize default user data
-    const DEFAULT_USER_DATA = {
-        profile: {
-            name: 'Gyana Ranjan',
-            created_at: Date.now(),
-            last_visit: Date.now()
-        },
-        preferences: {
-            language: 'en-GB',
-            theme: 'light',
-            voice_enabled: true
-        },
-        interests: [],
-        history: []
-    };
-
-    // Initialize context in localStorage if not exists
-    function initializeUserData() {
-        Object.entries(DEFAULT_USER_DATA).forEach(([key, value]) => {
-            const storageKey = STORAGE_KEYS[key.toUpperCase()];
-            if (!localStorage.getItem(storageKey)) {
-                localStorage.setItem(storageKey, JSON.stringify({
-                    data: value,
-                    timestamp: Date.now()
-                }));
-                console.log(`Initialized ${key}:`, value);
-            }
-        });
-    }
-
-    // Call this when the script loads
-    initializeUserData();
-
-    // Add this function to get user data
-    function getUserData(key) {
-        try {
-            const stored = localStorage.getItem(STORAGE_KEYS[key.toUpperCase()]);
-            if (stored) {
-                const { data } = JSON.parse(stored);
-                return data;
-            }
-        } catch (error) {
-            console.error(`Error getting ${key}:`, error);
-        }
-        return DEFAULT_USER_DATA[key];
-    }
-
-    // Add this to verify the data is stored
-    console.log('Current User Profile:', getUserData('profile'));
-    console.log('Current Preferences:', getUserData('preferences'));
-
-    // Function to update user data
-    function updateUserData(key, newData) {
-        try {
-            const storageKey = STORAGE_KEYS[key.toUpperCase()];
-            const currentData = getUserData(key);
-            const updatedData = {
-                ...currentData,
-                ...newData,
-                last_updated: Date.now()
-            };
-            
-            localStorage.setItem(storageKey, JSON.stringify({
-                data: updatedData,
-                timestamp: Date.now()
-            }));
-            
-            console.log(`Updated ${key}:`, updatedData);
-            return updatedData;
-        } catch (error) {
-            console.error(`Error updating ${key}:`, error);
-            return null;
-        }
-    }
-
-    // Example usage:
-    // updateUserData('profile', { name: 'Gyana Ranjan', age: 25 });
-    // updateUserData('preferences', { language: 'hi-IN' });
 }); 

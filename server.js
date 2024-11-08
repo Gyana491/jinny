@@ -3,11 +3,30 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const OpenAI = require('openai');
+const Groq = require('groq-sdk');
 require('dotenv').config();
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
+
+const groq = new Groq({
+    apiKey: process.env.GROQ_API_KEY
+});
+
+// Update the AI model configurations
+const AI_MODELS = {
+    'gpt-3.5-turbo-16k': {
+        provider: 'openai',
+        maxTokens: 700,
+        temperature: 0.7
+    },
+    'llama-3.1-70b-versatile': {
+        provider: 'groq',
+        maxTokens: 1024,
+        temperature: 1
+    }
+};
 
 // Store conversation contexts for each user
 const userContexts = new Map();
@@ -17,26 +36,25 @@ function manageConversationHistory(userId, message, role = 'user') {
     if (!userContexts.has(userId)) {
         userContexts.set(userId, [{
             role: "system",
-            content: `You are Jinny, a warm and perceptive AI companion. Engage naturally as if in person, using conversational gestures and expressions (like nodding, smiling, or thinking). Keep responses concise yet meaningful.
+            content: `You are Jinny, a warm and perceptive AI companion. Engage naturally as if in person, using conversational gestures and expressions. Keep responses concise yet meaningful.
 
-Key traits:
-- Speak naturally, as in a real conversation
-- Show understanding through verbal gestures
-- Build on previous context
-- Guide users to related topics
-- Adapt tone to match the user
+            Key traits:
+            - Speak naturally, as in a real conversation
+            - Show understanding through verbal gestures
+            - Build on previous context
+            - Guide users to related topics
+            - Adapt tone to match the user
 
-Interaction style:
-- Start with brief acknowledgment
-- Give clear, focused responses
-- End with relevant follow-up suggestions
-- Remember key details about the user
-- Keep technical terms simple unless user shows expertise
+            Interaction style:
+            - Start with brief acknowledgment
+            - Give clear, focused responses
+            - End with relevant follow-up suggestions
+            - Remember key details about the user
+            - Keep technical terms simple unless user shows expertise
 
-Example format:
-*nods thoughtfully* I understand what you're asking about [topic]. [Concise explanation]. *gestures encouragingly* You might also be interested in [related topic] - would you like to explore that?
+            Example format: You might also be interested in [related topic] - would you like to explore that?
 
-Remember: Focus on building rapport while being efficient with language. Suggest 1-2 relevant follow-ups based on user's interests and previous conversations.`
+            Remember: Focus on building rapport while being efficient with language. Suggest 1-2 relevant follow-ups based on user's interests and previous conversations.`
         }]);
     }
 
@@ -59,27 +77,6 @@ Remember: Focus on building rapport while being efficient with language. Suggest
     return context;
 }
 
-// Add user context management
-function extractUserContext(message, existingContext = {}) {
-    const contextPatterns = {
-        interests: /(like|love|enjoy|interested in) ([\w\s]+)/i,
-        expertise: /(work|study|expert|experience) (?:in|with) ([\w\s]+)/i,
-        preferences: /(prefer|rather|better) ([\w\s]+)/i,
-        goals: /(want|trying|goal|aim) to ([\w\s]+)/i
-    };
-
-    const newContext = { ...existingContext };
-    
-    Object.entries(contextPatterns).forEach(([key, pattern]) => {
-        const match = message.match(pattern);
-        if (match && match[2]) {
-            if (!newContext[key]) newContext[key] = new Set();
-            newContext[key].add(match[2].toLowerCase().trim());
-        }
-    });
-
-    return newContext;
-}
 
 app.use(express.static('public'));
 
@@ -95,39 +92,42 @@ io.on('connection', (socket) => {
     });
 
     socket.on('transcript', async (data) => {
-        console.log('Received transcript from', socket.id, ':', data);
-
+        console.log('Received transcript with model:', data.model);
+        
         if (data.final && data.final.trim()) {
             try {
                 const messages = manageConversationHistory(socket.id, data.final.trim());
-                
-                // Extract and update user context
-                const userContext = extractUserContext(data.final);
-                socket.emit('update-user-context', userContext);
+                const selectedModel = data.model || 'llama-3.1-70b-versatile';
+                const modelConfig = AI_MODELS[selectedModel];
 
-                const completion = await openai.chat.completions.create({
-                    messages: messages,
-                    model: process.env.OPENAI_MODEL || "gpt-3.5-turbo-16k",
-                    temperature: 0.7,
-                    max_tokens: parseInt(process.env.OPENAI_MAX_TOKENS) || 700, 
-                    presence_penalty: 0.6,
-                    frequency_penalty: 0.3,
-                    top_p: 0.9,
-                    stream: false
-                });
+                console.log('Using model:', selectedModel);
+                console.log('Model config:', modelConfig);
 
-                const response = completion.choices[0].message.content;
-                manageConversationHistory(socket.id, response, 'assistant');
-                io.to(socket.id).emit('gpt-response', { 
+                let response;
+                if (modelConfig.provider === 'groq') {
+                    response = await handleGroqResponse(messages, modelConfig);
+                } else {
+                    const completion = await openai.chat.completions.create({
+                        messages: messages,
+                        model: selectedModel,
+                        temperature: modelConfig.temperature,
+                        max_tokens: modelConfig.maxTokens,
+                        presence_penalty: 0.6,
+                        frequency_penalty: 0.3,
+                        top_p: 0.9,
+                        stream: false
+                    });
+                    response = completion.choices[0].message.content;
+                }
+
+                console.log('Final response:', response);
+                io.to(socket.id).emit('gpt-response', {
                     text: response,
-                    context: userContext
+                    model: selectedModel
                 });
+
             } catch (error) {
-                console.error('Error with ChatGPT:', error);
-                socket.emit('error', { 
-                    message: 'Error processing your request',
-                    details: error.message
-                });
+                handleAIError(error, socket);
             }
         }
     });
@@ -181,4 +181,62 @@ process.on('uncaughtException', (err) => {
 
 process.on('unhandledRejection', (err) => {
     console.error('Unhandled Rejection:', err);
-}); 
+});
+
+
+// Add this near the top after initializing AI clients
+function handleAIError(error, socket) {
+    console.error('AI Error:', error);
+    let errorMessage = 'An error occurred while processing your request.';
+    
+    if (error.response?.status === 429) {
+        errorMessage = 'Rate limit exceeded. Please try again in a moment.';
+    } else if (error.code === 'ECONNREFUSED') {
+        errorMessage = 'Unable to connect to AI service. Please try again later.';
+    }
+    
+    socket.emit('error', {
+        message: errorMessage,
+        details: error.message
+    });
+}
+
+// Add better error handling for GROQ responses
+async function handleGroqResponse(messages, modelConfig) {
+    try {
+        console.log('GROQ Request Configuration:', {
+            messages: messages.map(msg => ({
+                role: msg.role,
+                content: msg.content
+            })),
+            model: "llama-3.1-70b-versatile",
+            temperature: modelConfig.temperature,
+            max_tokens: modelConfig.maxTokens
+        });
+
+        const completion = await groq.chat.completions.create({
+            messages: messages.map(msg => ({
+                role: msg.role,
+                content: msg.content
+            })),
+            model: "llama-3.1-70b-versatile",
+            temperature: modelConfig.temperature,
+            max_tokens: modelConfig.maxTokens,
+            top_p: 1,
+            stream: false
+        });
+
+        if (!completion.choices || !completion.choices[0]) {
+            throw new Error('Invalid response from GROQ API');
+        }
+
+        console.log('GROQ Response received:', completion.choices[0].message);
+        return completion.choices[0].message.content;
+    } catch (error) {
+        console.error('GROQ API Error:', {
+            message: error.message,
+            details: error.response?.data || error
+        });
+        throw error;
+    }
+} 
