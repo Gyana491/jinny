@@ -24,9 +24,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Add these variables at the top
     const liveModeToggle = document.getElementById('liveMode');
     let isLiveMode = false;
-    let silenceTimer = null;
-    const SILENCE_THRESHOLD = 2000; // Changed to 2 seconds
-    let lastSpeechTimestamp = Date.now();
 
     // Add live mode toggle handler
     liveModeToggle.addEventListener('change', (e) => {
@@ -498,7 +495,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             isListening = false;
             if (isLiveMode && isLiveStarted && !isSpeaking) {
                 try {
-                    // Restart recognition immediately in live mode
+                    // Always restart recognition in live mode without any delay
                     recognition.start();
                     isListening = true;
                 } catch (error) {
@@ -516,32 +513,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             let interimTranscript = '';
             let finalTranscript = '';
 
-            // Only update timestamp and set silence timer if actual speech is detected
+            // Only update status if actual speech is detected
             const hasSpeech = Array.from(event.results).some(result => 
                 result[0].transcript.trim().length > 0
             );
 
-            if (hasSpeech) {
-                // Update last speech timestamp
-                lastSpeechTimestamp = Date.now();
-
-                // Clear existing silence timer
-                if (silenceTimer) {
-                    clearTimeout(silenceTimer);
-                }
-
-                // Set new silence timer only when speech is detected
-                silenceTimer = setTimeout(() => {
-                    if (isListening && !isSpeaking) {
-                        stopRecording();
-                        updateStatus('processing');
-                    }
-                }, SILENCE_THRESHOLD);
-
-                // Show listening status when user is speaking
-                if (isLiveMode) {
-                    updateStatus('listening');
-                }
+            if (hasSpeech && isLiveMode) {
+                updateStatus('listening');
             }
 
             for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -639,7 +617,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             try {
                 recognition.continuous = true; // Always continuous
                 recognition.start();
-                lastSpeechTimestamp = Date.now();
             } catch (error) {
                 console.error('Recognition start error:', error);
             }
