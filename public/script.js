@@ -498,7 +498,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             isListening = false;
             if (isLiveMode && isLiveStarted && !isSpeaking) {
                 try {
+                    // Restart recognition immediately in live mode
                     recognition.start();
+                    isListening = true;
                 } catch (error) {
                     console.error('Error restarting recognition:', error);
                 }
@@ -514,25 +516,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             let interimTranscript = '';
             let finalTranscript = '';
 
-            // Update last speech timestamp
-            lastSpeechTimestamp = Date.now();
+            // Only update timestamp and set silence timer if actual speech is detected
+            const hasSpeech = Array.from(event.results).some(result => 
+                result[0].transcript.trim().length > 0
+            );
 
-            // Clear existing silence timer
-            if (silenceTimer) {
-                clearTimeout(silenceTimer);
-            }
+            if (hasSpeech) {
+                // Update last speech timestamp
+                lastSpeechTimestamp = Date.now();
 
-            // Set new silence timer
-            silenceTimer = setTimeout(() => {
-                if (isListening && !isSpeaking) {
-                    stopRecording();
-                    updateStatus('processing');
+                // Clear existing silence timer
+                if (silenceTimer) {
+                    clearTimeout(silenceTimer);
                 }
-            }, SILENCE_THRESHOLD);
 
-            // Show listening status when user is speaking
-            if (isLiveMode) {
-                updateStatus('listening');
+                // Set new silence timer only when speech is detected
+                silenceTimer = setTimeout(() => {
+                    if (isListening && !isSpeaking) {
+                        stopRecording();
+                        updateStatus('processing');
+                    }
+                }, SILENCE_THRESHOLD);
+
+                // Show listening status when user is speaking
+                if (isLiveMode) {
+                    updateStatus('listening');
+                }
             }
 
             for (let i = event.resultIndex; i < event.results.length; i++) {
