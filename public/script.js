@@ -492,7 +492,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             voiceWave.classList.add('speaking');
             updateStatus(isLiveMode ? 'live' : 'listening');
             talkButton.classList.add('listening');
-            lastSpeechTimestamp = Date.now(); // Reset timestamp when starting
         };
 
         recognition.onend = () => {
@@ -526,14 +525,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Set new silence timer
             silenceTimer = setTimeout(() => {
                 if (isListening && !isSpeaking) {
-                    if (!isLiveMode) {
-                        stopRecording();
-                    }
+                    stopRecording();
                     updateStatus('processing');
                 }
             }, SILENCE_THRESHOLD);
 
-            // Process results
+            // Show listening status when user is speaking
+            if (isLiveMode) {
+                updateStatus('listening');
+            }
+
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 const transcript = event.results[i][0].transcript;
                 
@@ -544,16 +545,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                         stopSpeaking();
                     }
 
-                    // Send transcript
-                    socket.emit('transcript', {
-                        model: selectedAiModel,
-                        final: transcript.trim(),
-                        interim: ''
-                    });
-                    updateStatus('processing');
+                    // Send transcript in live mode
+                    if (isLiveMode) {
+                        socket.emit('transcript', {
+                            model: selectedAiModel,
+                            final: transcript.trim(),
+                            interim: ''
+                        });
+                        updateStatus('processing');
+                    }
                 } else {
                     interimTranscript += transcript;
                 }
+            }
+
+            // For non-live mode, send complete transcript
+            if (!isLiveMode && finalTranscript.trim()) {
+                socket.emit('transcript', {
+                    final: finalTranscript.trim(),
+                    interim: interimTranscript,
+                    model: selectedAiModel
+                });
             }
 
             transcriptDiv.innerHTML = finalTranscript || interimTranscript;
@@ -616,7 +628,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             voiceWave.classList.add('speaking');
             
             try {
-                recognition.continuous = true;
+                recognition.continuous = true; // Always continuous
                 recognition.start();
                 lastSpeechTimestamp = Date.now();
             } catch (error) {
