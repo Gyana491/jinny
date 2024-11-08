@@ -157,15 +157,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Voice initialization with selection options
+    // Update the voice initialization function
     async function initVoice() {
         return new Promise((resolve) => {
+            let voiceInitAttempts = 0;
+            const maxAttempts = 10;
+
             function initializeVoices() {
-                const voices = window.speechSynthesis.getVoices();
-                if (voices.length === 0) {
-                    setTimeout(initializeVoices, 100);
+                let voices = window.speechSynthesis.getVoices();
+                
+                if (voices.length === 0 && voiceInitAttempts < maxAttempts) {
+                    voiceInitAttempts++;
+                    setTimeout(initializeVoices, 250);
                     return;
                 }
+
+                // Force voices refresh in Chrome
+                voices = window.speechSynthesis.getVoices();
 
                 // Clear existing options
                 voiceSelect.innerHTML = '';
@@ -186,7 +194,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     selectedVoice = voices.find(voice => voice.name === prefs.voiceName);
                     if (selectedVoice) {
                         voiceSelect.value = selectedVoice.name;
-                        console.log('Restored saved voice:', selectedVoice.name);
                     }
                 }
 
@@ -204,11 +211,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 }
 
-                console.log('Voice initialized:', selectedVoice?.name);
-                console.log('Voice language:', selectedVoice?.lang);
-                console.log('Available voices:', voices.length);
-
-                // Update language display after voices are initialized
                 updateLanguageDisplay();
                 resolve(true);
             }
@@ -231,21 +233,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         const voices = window.speechSynthesis.getVoices();
         selectedVoice = voices.find(voice => voice.name === e.target.value);
         
-        console.log('Selected voice:', selectedVoice); // Debug log
-        console.log('Voice language:', selectedVoice?.lang); // Debug log
-        
-        // Test the selected voice
-        const testUtterance = new SpeechSynthesisUtterance('Testing voice change');
-        testUtterance.voice = selectedVoice;
-        window.speechSynthesis.speak(testUtterance);
-        
-        // Save preference
-        savePreferences();
-        
-        // Update language display
-        updateLanguageDisplay();
-        
-        console.log('Voice changed to:', selectedVoice.name);
+        if (selectedVoice) {
+            // Force voice refresh
+            window.speechSynthesis.cancel();
+            
+            // Test the selected voice with a delay
+            setTimeout(() => {
+                const testUtterance = new SpeechSynthesisUtterance('Testing voice change');
+                testUtterance.voice = selectedVoice;
+                testUtterance.lang = selectedVoice.lang;
+                window.speechSynthesis.speak(testUtterance);
+            }, 100);
+            
+            savePreferences();
+            updateLanguageDisplay();
+        }
     });
 
     // Language selection change handler
@@ -324,24 +326,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateStatus('ready');
         }
     }
-
-    // Add this function to manage microphone in live mode
-    function manageLiveModeRecognition(action) {
-        if (!isLiveMode || !recognition) return;
-        
-        try {
-            if (action === 'stop') {
-                recognition.stop();
-                console.log('Paused listening in live mode');
-            } else if (action === 'start') {
-                recognition.start();
-                console.log('Resumed listening in live mode');
-            }
-        } catch (error) {
-            console.error('Recognition control error:', error);
-        }
-    }
-
     // Add this function to manage microphone state
     function manageMicrophone(action) {
         if (!recognition) return;
@@ -390,7 +374,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Update the speak function with better status handling
+    // Update the speak function with better Chrome compatibility
     function speak(text) {
         return new Promise((resolve) => {
             if (isSpeaking) {
@@ -402,10 +386,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             const utterance = new SpeechSynthesisUtterance(text);
             currentUtterance = utterance;
             
+            // Force voice selection for Chrome
+            const voices = window.speechSynthesis.getVoices();
             if (selectedVoice) {
-                utterance.voice = selectedVoice;
-                utterance.lang = selectedVoice.lang;
+                // Find the voice again from current voices list
+                const currentVoice = voices.find(v => v.name === selectedVoice.name);
+                utterance.voice = currentVoice || selectedVoice;
+                utterance.lang = currentVoice?.lang || selectedVoice.lang;
             }
+
+            // Set rate and pitch for better reliability
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
 
             utterance.onstart = () => {
                 isSpeaking = true;
@@ -461,7 +453,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 resolve();
             };
 
-            window.speechSynthesis.speak(utterance);
+            // Chrome fix: Cancel any ongoing speech before starting new one
+            window.speechSynthesis.cancel();
+            
+            // Small delay before speaking (helps Chrome)
+            setTimeout(() => {
+                window.speechSynthesis.speak(utterance);
+            }, 50);
         });
     }
 
@@ -767,5 +765,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+
+    // Add this near the end of your DOMContentLoaded event listener
+    function checkAndFixSpeechSynthesis() {
+        if (isSpeaking) {
+            if (window.speechSynthesis.paused) {
+                window.speechSynthesis.resume();
+            }
+            
+            // Chrome bug workaround: if speaking but no audio, restart
+            if (currentUtterance && !window.speechSynthesis.speaking) {
+                window.speechSynthesis.speak(currentUtterance);
+            }
+        }
+    }
+
+    // Run the check frequently
+    setInterval(checkAndFixSpeechSynthesis, 100);
 
 }); 
