@@ -25,7 +25,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const liveModeToggle = document.getElementById('liveMode');
     let isLiveMode = false;
     let silenceTimer = null;
-    const SILENCE_THRESHOLD = 1000; // 1 second of silence before stopping
+    const SILENCE_THRESHOLD = 2000; // Changed to 2 seconds
+    let lastSpeechTimestamp = Date.now();
 
     // Add live mode toggle handler
     liveModeToggle.addEventListener('change', (e) => {
@@ -288,10 +289,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Add language options
     const models = [
-        { model: 'llama-3.1-70b-versatile',  name: 'Llama 3.1 (70B)' },
-        {model: 'gpt-3.5-turbo-16k', name: 'GPT-3.5 Turbo (16K)'},
-        
-    ]
+        { model: 'llama-3.1-70b-versatile', name: 'Llama 3.1 (70B)' },
+        { model: 'gpt-3.5-turbo-16k', name: 'GPT-3.5 Turbo (16K)' },
+        { model: 'gemma-7b-it', name: 'Gemma 7B' },
+        { model: 'gemma2-9b-it', name: 'Gemma 2 9B' },
+        { model: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B (Fast)' },
+        { model: 'llama-3.2-11b-text-preview', name: 'Llama 3.2 11B' },
+        { model: 'llama-3.2-90b-text-preview', name: 'Llama 3.2 90B' },
+        { model: 'llama-guard-3-8b', name: 'Llama Guard 3 8B' },
+        { model: 'llama3-70b-8192', name: 'Llama 3 70B (8K)' },
+        { model: 'llama3-8b-8192', name: 'Llama 3 8B (8K)' },
+        { model: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B' }
+    ];
 
     // Populate language selector
     models.forEach(model => {
@@ -429,7 +438,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     updateStatus('live');
                     setTimeout(() => {
                         manageMicrophone('start');
-                    }, 300);
+                    }, 100);
                 } else {
                     updateStatus('ready');
                 }
@@ -505,10 +514,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             let interimTranscript = '';
             let finalTranscript = '';
 
-            // Clear silence timer on new speech
+            // Update last speech timestamp
+            lastSpeechTimestamp = Date.now();
+
+            // Clear existing silence timer
             if (silenceTimer) {
                 clearTimeout(silenceTimer);
             }
+
+            // Set new silence timer
+            silenceTimer = setTimeout(() => {
+                if (isListening && !isSpeaking) {
+                    stopRecording();
+                    updateStatus('processing');
+                }
+            }, SILENCE_THRESHOLD);
 
             // Show listening status when user is speaking
             if (isLiveMode) {
@@ -521,25 +541,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (event.results[i].isFinal && transcript.trim().length > 0) {
                     finalTranscript += transcript + ' ';
                     
-                    // Stop current speech if Jinny is speaking
                     if (isSpeaking) {
                         stopSpeaking();
                     }
 
-                    // Send transcript immediately when in live mode
+                    // Send transcript in live mode
                     if (isLiveMode) {
-                        console.log('Emitting transcript (live mode):', {
-                            model: selectedAiModel,
-                            final: transcript.trim(),
-                            interim: ''
-                        });
                         socket.emit('transcript', {
                             model: selectedAiModel,
                             final: transcript.trim(),
                             interim: ''
                         });
-                        
-                        updateStatus('processing', '<span style="color: blue;"><i class="fas fa-cog fa-spin"></i> Processing...</span>');
+                        updateStatus('processing');
                     }
                 } else {
                     interimTranscript += transcript;
@@ -548,11 +561,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // For non-live mode, send complete transcript
             if (!isLiveMode && finalTranscript.trim()) {
-                console.log('Emitting transcript (normal mode):', {
-                    final: finalTranscript.trim(),
-                    interim: interimTranscript,
-                    model: selectedAiModel
-                });
                 socket.emit('transcript', {
                     final: finalTranscript.trim(),
                     interim: interimTranscript,
@@ -561,15 +569,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             transcriptDiv.innerHTML = finalTranscript || interimTranscript;
-
-            // Reset silence timer
-            if (isLiveMode) {
-                silenceTimer = setTimeout(() => {
-                    if (!isSpeaking) {
-                        updateStatus('live');
-                    }
-                }, SILENCE_THRESHOLD);
-            }
         };
 
         // Update GPT response handler
@@ -578,6 +577,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             responseDiv.scrollTop = responseDiv.scrollHeight;
             
             try {
+                // Stop any ongoing speech
+                if (isSpeaking) {
+                    window.speechSynthesis.cancel();
+                    isSpeaking = false;
+                    isPaused = false;
+                }
+
                 voiceWave.classList.add('speaking');
                 updateStatus('speaking');
                 // Turn off microphone before speaking
@@ -593,7 +599,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (!isSpeaking && !isListening) {
                         setTimeout(() => {
                             voiceWave.classList.remove('speaking');
-                            
                         }, 1000);
                     }
                 }
@@ -602,33 +607,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (isLiveMode) {
                     manageMicrophone('start');
                 }
-                
             }
         });
 
-        // Updated button event listeners with long press support
-        let pressTimer = null;
-        let isLongPress = false;
+        // Simplified button event listeners
+        talkButton.addEventListener('click', (e) => {
+            if (!isListening) {
+                startRecording(e);
+            } else {
+                stopRecording(e);
+            }
+        });
 
         // Helper function to handle start of recording
         function startRecording(e) {
             if (e) e.preventDefault();
             if (isSpeaking) stopSpeaking();
             
-            // Visual feedback
             talkButton.classList.add('active');
             voiceWave.classList.add('speaking');
             
-            // Start recording
             try {
+                recognition.continuous = true; // Always continuous
                 recognition.start();
-                
-                // Start long press timer
-                pressTimer = setTimeout(() => {
-                    isLongPress = true;
-                    // Add visual feedback for long press
-                    talkButton.classList.add('long-press');
-                }, 500); // 500ms to trigger long press
+                lastSpeechTimestamp = Date.now();
             } catch (error) {
                 console.error('Recognition start error:', error);
             }
@@ -637,34 +639,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Helper function to handle end of recording
         function stopRecording(e) {
             if (e) e.preventDefault();
+            talkButton.classList.remove('active');
             
-            // Clear long press timer
-            clearTimeout(pressTimer);
-            
-            // Visual feedback
-            talkButton.classList.remove('active', 'long-press');
-            
-            // Only stop recognition if it wasn't a long press or if we're ending a long press
-            if (!isLongPress || (isLongPress && e.type === 'touchend')) {
-                try {
-                    recognition.stop();
-                } catch (error) {
-                    console.error('Recognition stop error:', error);
-                }
+            try {
+                recognition.stop();
+            } catch (error) {
+                console.error('Recognition stop error:', error);
             }
-            
-            isLongPress = false;
         }
-
-        // Mouse events
-        talkButton.addEventListener('mousedown', startRecording);
-        talkButton.addEventListener('mouseup', stopRecording);
-        talkButton.addEventListener('mouseleave', stopRecording);
-
-        // Touch events
-        talkButton.addEventListener('touchstart', startRecording, { passive: false });
-        talkButton.addEventListener('touchend', stopRecording, { passive: false });
-        talkButton.addEventListener('touchcancel', stopRecording, { passive: false });
 
         // Add touch feedback function
         function addTouchFeedback(element) {

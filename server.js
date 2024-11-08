@@ -21,10 +21,55 @@ const AI_MODELS = {
         maxTokens: 700,
         temperature: 0.7
     },
+    'gemma-7b-it': {
+        provider: 'groq',
+        maxTokens: 1024,
+        temperature: 0.7
+    },
+    'gemma2-9b-it': {
+        provider: 'groq',
+        maxTokens: 1024,
+        temperature: 0.7
+    },
     'llama-3.1-70b-versatile': {
         provider: 'groq',
         maxTokens: 1024,
         temperature: 1
+    },
+    'llama-3.1-8b-instant': {
+        provider: 'groq',
+        maxTokens: 1024,
+        temperature: 0.7
+    },
+    'llama-3.2-11b-text-preview': {
+        provider: 'groq',
+        maxTokens: 1024,
+        temperature: 0.7
+    },
+    'llama-3.2-90b-text-preview': {
+        provider: 'groq',
+        maxTokens: 1024,
+        temperature: 0.7
+    },
+    'llama-guard-3-8b': {
+        provider: 'groq',
+        maxTokens: 1024,
+        temperature: 0.7
+    },
+    'llama3-70b-8192': {
+        provider: 'groq',
+        maxTokens: 1024,
+        temperature: 0.7
+    },
+    'llama3-8b-8192': {
+        provider: 'groq',
+        maxTokens: 1024,
+        temperature: 0.7
+    },
+    'mixtral-8x7b-32768': {
+        provider: 'groq',
+        maxTokens: 1024,
+        temperature: 0.7
     }
 };
 
