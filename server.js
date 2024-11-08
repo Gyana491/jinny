@@ -55,7 +55,7 @@ function manageConversationHistory(userId, message, role = 'user') {
             Avoid:
             - Avoid Emojis
             - Avoid Markdown
-            - Avoid FOrmatting symbols
+            - Avoid FOrmatting & symbols
             - Avoid html
 
             Voice command examples:
