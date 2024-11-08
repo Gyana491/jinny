@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Add these variables at the top
     const liveModeToggle = document.getElementById('liveMode');
     let isLiveMode = false;
+    let silenceTimer = null;
+    const SILENCE_THRESHOLD = 2000; // Changed to 2 seconds
+    let lastSpeechTimestamp = Date.now();
 
     // Add live mode toggle handler
     liveModeToggle.addEventListener('change', (e) => {
@@ -489,15 +492,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             voiceWave.classList.add('speaking');
             updateStatus(isLiveMode ? 'live' : 'listening');
             talkButton.classList.add('listening');
+            lastSpeechTimestamp = Date.now(); // Reset timestamp when starting
         };
 
         recognition.onend = () => {
             isListening = false;
             if (isLiveMode && isLiveStarted && !isSpeaking) {
                 try {
-                    // Always restart recognition in live mode without any delay
                     recognition.start();
-                    isListening = true;
                 } catch (error) {
                     console.error('Error restarting recognition:', error);
                 }
@@ -513,15 +515,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             let interimTranscript = '';
             let finalTranscript = '';
 
-            // Only update status if actual speech is detected
-            const hasSpeech = Array.from(event.results).some(result => 
-                result[0].transcript.trim().length > 0
-            );
+            // Update last speech timestamp
+            lastSpeechTimestamp = Date.now();
 
-            if (hasSpeech && isLiveMode) {
-                updateStatus('listening');
+            // Clear existing silence timer
+            if (silenceTimer) {
+                clearTimeout(silenceTimer);
             }
 
+            // Set new silence timer
+            silenceTimer = setTimeout(() => {
+                if (isListening && !isSpeaking) {
+                    if (!isLiveMode) {
+                        stopRecording();
+                    }
+                    updateStatus('processing');
+                }
+            }, SILENCE_THRESHOLD);
+
+            // Process results
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 const transcript = event.results[i][0].transcript;
                 
@@ -532,27 +544,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                         stopSpeaking();
                     }
 
-                    // Send transcript in live mode
-                    if (isLiveMode) {
-                        socket.emit('transcript', {
-                            model: selectedAiModel,
-                            final: transcript.trim(),
-                            interim: ''
-                        });
-                        updateStatus('processing');
-                    }
+                    // Send transcript
+                    socket.emit('transcript', {
+                        model: selectedAiModel,
+                        final: transcript.trim(),
+                        interim: ''
+                    });
+                    updateStatus('processing');
                 } else {
                     interimTranscript += transcript;
                 }
-            }
-
-            // For non-live mode, send complete transcript
-            if (!isLiveMode && finalTranscript.trim()) {
-                socket.emit('transcript', {
-                    final: finalTranscript.trim(),
-                    interim: interimTranscript,
-                    model: selectedAiModel
-                });
             }
 
             transcriptDiv.innerHTML = finalTranscript || interimTranscript;
@@ -615,8 +616,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             voiceWave.classList.add('speaking');
             
             try {
-                recognition.continuous = true; // Always continuous
+                recognition.continuous = true;
                 recognition.start();
+                lastSpeechTimestamp = Date.now();
             } catch (error) {
                 console.error('Recognition start error:', error);
             }
