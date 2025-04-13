@@ -1,4 +1,4 @@
-* 🤖 JINNY - Your Personal Voice Assistant & Learning Companion
+🤖 JINNY - Your Personal Voice Assistant & Learning Companion
 
 Live : [https://jinny.onrender.com/](https://jinny.onrender.com/)
 
