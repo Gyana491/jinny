@@ -118,9 +118,7 @@ Open your browser and navigate to http://localhost:3000
 
 For support, email [gyanaranjanmohanta2004@gmail.com](mailto:gyanaranjanmohanta2004@gmail.com)
 
-## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
