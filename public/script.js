@@ -96,11 +96,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function loadPreferences() {
-        selectedAiModel = localStorage.getItem('selectedAiModel') || 'llama-3.1-70b-versatile';
+        selectedAiModel = localStorage.getItem('selectedAiModel') || 'meta-llama/llama-4-maverick-17b-128e-instruct';
         return {
             voiceName: localStorage.getItem('selectedVoiceName'),
             language: localStorage.getItem('selectedLanguage') || 'en-GB',
-            aiModel: localStorage.getItem('selectedAiModel') || 'llama-3.1-70b-versatile'
+            aiModel: localStorage.getItem('selectedAiModel') || 'meta-llama/llama-4-maverick-17b-128e-instruct'
         };
     }
 
@@ -292,18 +292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         { model: 'gpt-3.5-turbo-16k', name: 'GPT-3.5 Turbo (16K)' },
         { model: 'meta-llama/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout (17B)' },
         { model: 'meta-llama/llama-4-maverick-17b-128e-instruct', name: 'Llama 4 Maverick (17B)' },
-        { model: 'qwen-qwq-32b', name: 'Qwen QWQ (32B)' },
-        { model: 'mistral-saba-24b', name: 'Mistral Saba (24B)' },
-        { model: 'qwen-2.5-coder-32b', name: 'Qwen 2.5 Coder (32B)' },
-        { model: 'qwen-2.5-32b', name: 'Qwen 2.5 (32B)' },
-        { model: 'deepseek-r1-distill-qwen-32b', name: 'DeepSeek R1 Qwen (32B)' },
-        { model: 'deepseek-r1-distill-llama-70b', name: 'DeepSeek R1 Llama (70B)' },
-        { model: 'llama-3.3-70b-specdec', name: 'Llama 3.3 (70B)' },
-        { model: 'llama-3.2-1b-preview', name: 'Llama 3.2 (1B)' },
-        { model: 'llama-3.2-3b-preview', name: 'Llama 3.2 (3B)' },
-        { model: 'llama-3.2-11b-vision-preview', name: 'Llama 3.2 Vision (11B)' },
-        { model: 'llama-3.2-90b-vision-preview', name: 'Llama 3.2 Vision (90B)' },
-        { model: 'allam-2-7b', name: 'Allam 2 (7B)' }
+        
     ];
 
     // Populate language selector
