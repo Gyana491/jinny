@@ -21,54 +21,74 @@ const AI_MODELS = {
         maxTokens: 700,
         temperature: 0.7
     },
-    'gemma-7b-it': {
+    'meta-llama/llama-4-scout-17b-16e-instruct': {
         provider: 'groq',
-        maxTokens: 1024,
+        maxTokens: 8192,
         temperature: 0.7
     },
-    'gemma2-9b-it': {
+    'meta-llama/llama-4-maverick-17b-128e-instruct': {
         provider: 'groq',
-        maxTokens: 1024,
+        maxTokens: 8192,
         temperature: 0.7
     },
-    'llama-3.1-70b-versatile': {
+    'qwen-qwq-32b': {
         provider: 'groq',
-        maxTokens: 1024,
-        temperature: 1
-    },
-    'llama-3.1-8b-instant': {
-        provider: 'groq',
-        maxTokens: 1024,
+        maxTokens: 8192,
         temperature: 0.7
     },
-    'llama-3.2-11b-text-preview': {
+    'mistral-saba-24b': {
         provider: 'groq',
-        maxTokens: 1024,
+        maxTokens: 8192,
         temperature: 0.7
     },
-    'llama-3.2-90b-text-preview': {
+    'qwen-2.5-coder-32b': {
         provider: 'groq',
-        maxTokens: 1024,
+        maxTokens: 8192,
         temperature: 0.7
     },
-    'llama-guard-3-8b': {
+    'qwen-2.5-32b': {
         provider: 'groq',
-        maxTokens: 1024,
+        maxTokens: 8192,
         temperature: 0.7
     },
-    'llama3-70b-8192': {
+    'deepseek-r1-distill-qwen-32b': {
         provider: 'groq',
-        maxTokens: 1024,
+        maxTokens: 8192,
         temperature: 0.7
     },
-    'llama3-8b-8192': {
+    'deepseek-r1-distill-llama-70b': {
         provider: 'groq',
-        maxTokens: 1024,
+        maxTokens: 8192,
         temperature: 0.7
     },
-    'mixtral-8x7b-32768': {
+    'llama-3.3-70b-specdec': {
         provider: 'groq',
-        maxTokens: 1024,
+        maxTokens: 4096,
+        temperature: 0.7
+    },
+    'llama-3.2-1b-preview': {
+        provider: 'groq',
+        maxTokens: 8192,
+        temperature: 0.7
+    },
+    'llama-3.2-3b-preview': {
+        provider: 'groq',
+        maxTokens: 8192,
+        temperature: 0.7
+    },
+    'llama-3.2-11b-vision-preview': {
+        provider: 'groq',
+        maxTokens: 8192,
+        temperature: 0.7
+    },
+    'llama-3.2-90b-vision-preview': {
+        provider: 'groq',
+        maxTokens: 8192,
+        temperature: 0.7
+    },
+    'allam-2-7b': {
+        provider: 'groq',
+        maxTokens: 2048,
         temperature: 0.7
     }
 };

@@ -289,17 +289,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Add language options
     const models = [
-        { model: 'llama-3.1-70b-versatile', name: 'Llama 3.1 (70B)' },
         { model: 'gpt-3.5-turbo-16k', name: 'GPT-3.5 Turbo (16K)' },
-        { model: 'gemma-7b-it', name: 'Gemma 7B' },
-        { model: 'gemma2-9b-it', name: 'Gemma 2 9B' },
-        { model: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B (Fast)' },
-        { model: 'llama-3.2-11b-text-preview', name: 'Llama 3.2 11B' },
-        { model: 'llama-3.2-90b-text-preview', name: 'Llama 3.2 90B' },
-        { model: 'llama-guard-3-8b', name: 'Llama Guard 3 8B' },
-        { model: 'llama3-70b-8192', name: 'Llama 3 70B (8K)' },
-        { model: 'llama3-8b-8192', name: 'Llama 3 8B (8K)' },
-        { model: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B' }
+        { model: 'meta-llama/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout (17B)' },
+        { model: 'meta-llama/llama-4-maverick-17b-128e-instruct', name: 'Llama 4 Maverick (17B)' },
+        { model: 'qwen-qwq-32b', name: 'Qwen QWQ (32B)' },
+        { model: 'mistral-saba-24b', name: 'Mistral Saba (24B)' },
+        { model: 'qwen-2.5-coder-32b', name: 'Qwen 2.5 Coder (32B)' },
+        { model: 'qwen-2.5-32b', name: 'Qwen 2.5 (32B)' },
+        { model: 'deepseek-r1-distill-qwen-32b', name: 'DeepSeek R1 Qwen (32B)' },
+        { model: 'deepseek-r1-distill-llama-70b', name: 'DeepSeek R1 Llama (70B)' },
+        { model: 'llama-3.3-70b-specdec', name: 'Llama 3.3 (70B)' },
+        { model: 'llama-3.2-1b-preview', name: 'Llama 3.2 (1B)' },
+        { model: 'llama-3.2-3b-preview', name: 'Llama 3.2 (3B)' },
+        { model: 'llama-3.2-11b-vision-preview', name: 'Llama 3.2 Vision (11B)' },
+        { model: 'llama-3.2-90b-vision-preview', name: 'Llama 3.2 Vision (90B)' },
+        { model: 'allam-2-7b', name: 'Allam 2 (7B)' }
     ];
 
     // Populate language selector
